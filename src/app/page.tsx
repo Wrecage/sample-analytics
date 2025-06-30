@@ -259,6 +259,8 @@ export default function InventoryAnalytics() {
     selectedCategory: "",
   });
 
+  const [selectedBuyerId, setSelectedBuyerId] = useState("");
+
   const tabs = [
     { id: "sales", label: "Sales" },
     { id: "inventory-flow", label: "Inventory Flow" },
@@ -332,6 +334,28 @@ export default function InventoryAnalytics() {
     
     return filtered;
   }, [buyerSyncFilters]);
+
+  const selectedBuyer = useMemo(() => {
+    return sampleBuyerData.find(b => b.buyerId === selectedBuyerId) || sampleBuyerData[0];
+  }, [selectedBuyerId]);
+
+  const generateBuyerPurchaseFrequency = (buyer: BuyerData) => {
+    // Group orders by month
+    const freq: { [month: string]: number } = {};
+    buyer.orders.forEach(order => {
+      const month = order.date.slice(0, 7); // YYYY-MM
+      freq[month] = (freq[month] || 0) + 1;
+    });
+    const months = Object.keys(freq).sort();
+    return {
+      labels: months,
+      datasets: [{
+        label: "Purchase Frequency",
+        data: months.map(m => freq[m]),
+        backgroundColor: "rgba(59, 130, 246, 0.8)",
+      }]
+    };
+  };
 
   // Chart Data Generators
   const generateSalesChartData = (data: SalesData[]) => {
@@ -624,12 +648,11 @@ export default function InventoryAnalytics() {
       case "buyers":
         return (
           <div className="space-y-6">
-            <div className="bg-[#202021] border border-[#D4D4D4] rounded-lg p-4">
+            <div className="bg-[#202021] border border-[#D4D4D4] rounded-md p-4">
               <h4 className="font-semibold text-green-400">Repeat Buyer Rate</h4>
               <p className="text-2xl font-bold">68.5%</p>
             </div>
-            
-            <div className="bg-[#161716] border border-[#D4D4D4] rounded-2xl p-6">
+            <div className="bg-[#161716] border border-[#D4D4D4] rounded-lg p-6">
               <h3 className="text-lg font-semibold mb-4">Top Buyers</h3>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
@@ -663,34 +686,46 @@ export default function InventoryAnalytics() {
                 </table>
               </div>
             </div>
-
+            {/* Buyer selection for mobile and desktop */}
+            <div className="flex flex-col sm:flex-row gap-2 items-start sm:items-center">
+              <label htmlFor="buyer-select" className="text-sm font-medium">Select Buyer:</label>
+              <select
+                id="buyer-select"
+                className="bg-[#202021] border border-[#D4D4D4] rounded-md px-3 py-2 text-sm w-full sm:w-auto"
+                value={selectedBuyerId}
+                onChange={e => setSelectedBuyerId(e.target.value)}
+              >
+                {sampleBuyerData.map(buyer => (
+                  <option key={buyer.buyerId} value={buyer.buyerId}>{buyer.buyerName}</option>
+                ))}
+              </select>
+            </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="bg-[#161716] border border-[#D4D4D4] rounded-2xl p-6">
+              <div className="bg-[#161716] border border-[#D4D4D4] rounded-lg p-6">
                 <h3 className="text-lg font-semibold mb-4">Selected Buyer Overview</h3>
                 <div className="space-y-3">
                   <div>
                     <p className="text-sm text-gray-400">Last Purchase</p>
-                    <p className="font-semibold">2024-01-15</p>
+                    <p className="font-semibold">{selectedBuyer.orders[selectedBuyer.orders.length-1]?.date || '-'}</p>
                   </div>
                   <div>
                     <p className="text-sm text-gray-400">Total Items Bought</p>
-                    <p className="font-semibold">1,250</p>
+                    <p className="font-semibold">{selectedBuyer.orders.reduce((sum, o) => sum + o.quantity, 0)}</p>
                   </div>
                   <div>
                     <p className="text-sm text-gray-400">Total Spent</p>
-                    <p className="font-semibold">₱45,000</p>
+                    <p className="font-semibold">₱{selectedBuyer.orders.reduce((sum, o) => sum + o.amount, 0).toLocaleString()}</p>
                   </div>
                   <div>
                     <p className="text-sm text-gray-400">Buyer Type</p>
-                    <p className="font-semibold text-blue-400">Reseller</p>
+                    <p className="font-semibold text-blue-400">{selectedBuyer.buyerType.charAt(0).toUpperCase() + selectedBuyer.buyerType.slice(1)}</p>
                   </div>
                 </div>
               </div>
-              
-              <div className="bg-[#161716] border border-[#D4D4D4] rounded-2xl p-6">
+              <div className="bg-[#161716] border border-[#D4D4D4] rounded-lg p-6">
                 <h3 className="text-lg font-semibold mb-4">Purchase Frequency</h3>
                 <div className="h-64">
-                  <Bar data={generateBuyerSyncChartData(sampleBuyerData)} options={chartOptions} />
+                  <Bar data={generateBuyerPurchaseFrequency(selectedBuyer)} options={chartOptions} />
                 </div>
               </div>
             </div>
@@ -805,41 +840,41 @@ export default function InventoryAnalytics() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0B0A0B] p-8">
+    <div className="min-h-screen bg-[#0B0A0B] p-4 sm:p-8">
       <div className="max-w-7xl mx-auto space-y-8">
         {/* Header */}
         <div className="text-center">
-          <h1 className="text-4xl font-bold text-white">Inventory Analytics</h1>
+          <h1 className="text-3xl sm:text-4xl font-bold text-white">Inventory Analytics</h1>
         </div>
 
         {/* KPI Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          <div className="bg-[#161716] border border-[#D4D4D4] rounded-2xl p-6 hover:bg-[#262626] transition-colors">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+          <div className="bg-[#161716] border border-[#D4D4D4] rounded-lg p-4 sm:p-6 hover:bg-[#262626] transition-colors">
             <h3 className="text-sm text-gray-400 mb-2">Total Sales</h3>
-            <p className="text-3xl font-bold text-green-400">₱123,000</p>
+            <p className="text-2xl sm:text-3xl font-bold text-green-400">₱123,000</p>
           </div>
-          <div className="bg-[#161716] border border-[#D4D4D4] rounded-2xl p-6 hover:bg-[#262626] transition-colors">
+          <div className="bg-[#161716] border border-[#D4D4D4] rounded-lg p-4 sm:p-6 hover:bg-[#262626] transition-colors">
             <h3 className="text-sm text-gray-400 mb-2">Top-Selling Product</h3>
-            <p className="text-3xl font-bold text-blue-400">Product A</p>
+            <p className="text-2xl sm:text-3xl font-bold text-blue-400">Product A</p>
           </div>
-          <div className="bg-[#161716] border border-[#D4D4D4] rounded-2xl p-6 hover:bg-[#262626] transition-colors">
+          <div className="bg-[#161716] border border-[#D4D4D4] rounded-lg p-4 sm:p-6 hover:bg-[#262626] transition-colors">
             <h3 className="text-sm text-gray-400 mb-2">Inventory Items</h3>
-            <p className="text-3xl font-bold text-yellow-400">1,250</p>
+            <p className="text-2xl sm:text-3xl font-bold text-yellow-400">1,250</p>
           </div>
-          <div className="bg-[#161716] border border-[#D4D4D4] rounded-2xl p-6 hover:bg-[#262626] transition-colors">
+          <div className="bg-[#161716] border border-[#D4D4D4] rounded-lg p-4 sm:p-6 hover:bg-[#262626] transition-colors">
             <h3 className="text-sm text-gray-400 mb-2">Repeat Buyer Rate</h3>
-            <p className="text-3xl font-bold text-purple-400">68.5%</p>
+            <p className="text-2xl sm:text-3xl font-bold text-purple-400">68.5%</p>
           </div>
         </div>
 
         {/* Tab Navigation */}
-        <div className="bg-[#161716] border border-[#D4D4D4] rounded-2xl p-2">
+        <div className="bg-[#161716] border border-[#D4D4D4] rounded-lg p-1 sm:p-2">
           <div className="flex flex-wrap gap-2">
             {tabs.map((tab) => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                className={`px-3 sm:px-4 py-2 rounded-md text-sm font-medium transition-colors ${
                   activeTab === tab.id
                     ? "bg-[#202021] border border-[#D4D4D4] text-white"
                     : "text-gray-400 hover:text-white hover:bg-[#202021]"
@@ -852,7 +887,7 @@ export default function InventoryAnalytics() {
         </div>
 
         {/* Tab Content */}
-        <div className="bg-[#161716] border border-[#D4D4D4] rounded-2xl p-6">
+        <div className="bg-[#161716] border border-[#D4D4D4] rounded-lg p-4 sm:p-6">
           {renderTabContent()}
         </div>
       </div>
